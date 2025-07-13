@@ -4,62 +4,23 @@ import webbrowser
 import openai
 from config import apikey
 import datetime
-import random
-import numpy as np
+import pyttsx3
 
+openai.api_key = apikey
 
-chatStr = ""
-# https://youtu.be/Z3ZAJoi4x6Q
-def chat(query):
-    global chatStr
-    print(chatStr)
-    openai.api_key = apikey
-    chatStr += f"Harry: {query}\n Jarvis: "
-    response = openai.Completion.create(
-        model="text-davinci-003",
-        prompt= chatStr,
-        temperature=0.7,
-        max_tokens=256,
-        top_p=1,
-        frequency_penalty=0,
-        presence_penalty=0
-    )
-    # todo: Wrap this inside of a  try catch block
-    say(response["choices"][0]["text"])
-    chatStr += f"{response['choices'][0]['text']}\n"
-    return response["choices"][0]["text"]
+chat_history = []
 
-
-def ai(prompt):
-    openai.api_key = apikey
-    text = f"OpenAI response for Prompt: {prompt} \n *************************\n\n"
-
-    response = openai.Completion.create(
-        model="text-davinci-003",
-        prompt=prompt,
-        temperature=0.7,
-        max_tokens=256,
-        top_p=1,
-        frequency_penalty=0,
-        presence_penalty=0
-    )
-    # todo: Wrap this inside of a  try catch block
-    # print(response["choices"][0]["text"])
-    text += response["choices"][0]["text"]
-    if not os.path.exists("Openai"):
-        os.mkdir("Openai")
-
-    # with open(f"Openai/prompt- {random.randint(1, 2343434356)}", "w") as f:
-    with open(f"Openai/{''.join(prompt.split('intelligence')[1:]).strip() }.txt", "w") as f:
-        f.write(text)
+# Initialize pyttsx3 once for better performance
+engine = pyttsx3.init()
 
 def say(text):
-    os.system(f'say "{text}"')
+    engine.say(text)
+    engine.runAndWait()
 
 def takeCommand():
     r = sr.Recognizer()
     with sr.Microphone() as source:
-        # r.pause_threshold =  0.6
+        print("Listening...")
         audio = r.listen(source)
         try:
             print("Recognizing...")
@@ -67,52 +28,77 @@ def takeCommand():
             print(f"User said: {query}")
             return query
         except Exception as e:
-            return "Some Error Occurred. Sorry from Jarvis"
+            print("Sorry, I could not understand.", e)
+            return ""
 
-if __name__ == '__main__':
-    print('Welcome to Jarvis A.I')
-    say("Jarvis A.I")
+def chat(query):
+    global chat_history
+    chat_history.append({"role": "user", "content": query})
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=chat_history
+        )
+        message = response["choices"][0]["message"]["content"]
+        say(message)
+        chat_history.append({"role": "assistant", "content": message})
+        return message
+    except Exception as e:
+        print("OpenAI API error:", e)
+        say("Sorry, I am having trouble reaching the AI service.")
+        return ""
+
+if __name__ == "__main__":
+    say("Jarvis AI activated")
+    print("Welcome to Jarvis A.I")
+
     while True:
-        print("Listening...")
         query = takeCommand()
-        # todo: Add more sites
-        sites = [["youtube", "https://www.youtube.com"], ["wikipedia", "https://www.wikipedia.com"], ["google", "https://www.google.com"],]
+
+        if not query:
+            continue
+
+        # Open websites commands
+        sites = [
+            ["youtube", "https://www.youtube.com"],
+            ["wikipedia", "https://www.wikipedia.com"],
+            ["google", "https://www.google.com"]
+        ]
+        opened_site = False
         for site in sites:
-            if f"Open {site[0]}".lower() in query.lower():
-                say(f"Opening {site[0]} sir...")
+            if f"open {site[0]}" in query.lower():
+                say(f"Opening {site[0]}")
                 webbrowser.open(site[1])
-        # todo: Add a feature to play a specific song
-        if "open music" in query:
-            musicPath = "/Users/harry/Downloads/downfall-21371.mp3"
-            os.system(f"open {musicPath}")
+                opened_site = True
+                break
+        if opened_site:
+            continue
 
-        elif "the time" in query:
-            musicPath = "/Users/harry/Downloads/downfall-21371.mp3"
+        if "open music" in query.lower():
+            # Update this path to a valid music file on your system
+            musicPath = "/home/susan/Music/example.mp3"
+            if os.path.exists(musicPath):
+                os.system(f"xdg-open '{musicPath}'")
+                say("Playing music")
+            else:
+                say("Music file not found")
+            continue
+
+        elif "the time" in query.lower():
             hour = datetime.datetime.now().strftime("%H")
-            min = datetime.datetime.now().strftime("%M")
-            say(f"Sir time is {hour} bajke {min} minutes")
+            minute = datetime.datetime.now().strftime("%M")
+            say(f"Sir, the time is {hour} bajke {minute} minutes")
+            continue
 
-        elif "open facetime".lower() in query.lower():
-            os.system(f"open /System/Applications/FaceTime.app")
+        elif "reset chat" in query.lower():
+            chat_history = []
+            say("Chat history has been cleared")
+            continue
 
-        elif "open pass".lower() in query.lower():
-            os.system(f"open /Applications/Passky.app")
-
-        elif "Using artificial intelligence".lower() in query.lower():
-            ai(prompt=query)
-
-        elif "Jarvis Quit".lower() in query.lower():
-            exit()
-
-        elif "reset chat".lower() in query.lower():
-            chatStr = ""
+        elif "jarvis quit" in query.lower() or "exit" in query.lower():
+            say("Shutting down Jarvis. Goodbye!")
+            break
 
         else:
-            print("Chatting...")
+            print("Chatting with AI...")
             chat(query)
-
-
-
-
-
-        # say(query)
